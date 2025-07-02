@@ -2,6 +2,7 @@
 session_start();
 require 'conexion.php';
 
+// Si ya está logueado, redirige
 if (isset($_SESSION['usuario_rol'])) {
     header('Location: dashboard.php');
     exit();
@@ -12,25 +13,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     $usuario = trim($_POST['usuario']);
     $contrasena = trim($_POST['contrasena']);
 
-    $stmt = $conn->prepare("SELECT id, nombre, apellidos, rol, localidad, contrasena FROM reg_usuarios WHERE usuario = ? OR correo = ?");
-    $stmt->bind_param('ss', $usuario, $usuario);
+    // Buscar usuario por campo 'user' y que esté Activo
+    $stmt = $conn->prepare("
+        SELECT 
+            u.id_usuario, 
+            u.user, 
+            u.password, 
+            u.rol_id, 
+            u.id_misionero, 
+            u.condicion,
+            m.nombres,
+            m.apellidos,
+            l.nombre as localidad_nombre
+        FROM usuarios u
+        LEFT JOIN misioneros m ON u.id_misionero = m.id
+        LEFT JOIN localidades l ON m.localidad = l.id
+        WHERE u.user = ? AND u.condicion = 'Activo'
+        LIMIT 1
+    ");
+    $stmt->bind_param('s', $usuario);
     $stmt->execute();
     $stmt->store_result();
 
     if ($stmt->num_rows === 1) {
-        $stmt->bind_result($id, $nombre, $apellidos, $rol, $localidad, $hash);
+        $stmt->bind_result(
+            $id_usuario, $user, $password_hash, $rol_id, $id_misionero, $condicion,
+            $nombre, $apellidos, $localidad_nombre
+        );
         $stmt->fetch();
-        if (password_verify($contrasena, $hash)) {
-            $_SESSION['usuario_id'] = $id;
+        if (password_verify($contrasena, $password_hash)) {
+            // Aquí puedes obtener el nombre de rol si lo necesitas con otra consulta JOIN a la tabla roles
+            $_SESSION['usuario_id'] = $id_usuario;
             $_SESSION['usuario_nombre'] = $nombre;
             $_SESSION['usuario_apellidos'] = $apellidos;
-            $_SESSION['usuario_rol'] = $rol;
-            $_SESSION['usuario_localidad'] = $localidad;
+            $_SESSION['usuario_rol'] = $rol_id; // Puedes guardar el id_rol o hacer un JOIN y guardar el nombre del rol
+            $_SESSION['id_misionero'] = $id_misionero;
+            $_SESSION['usuario_localidad'] = $localidad_nombre;
             header('Location: dashboard.php');
             exit();
         }
     }
-    $error = 'Usuario o contraseña incorrectos.';
+    $error = 'Usuario o contraseña incorrectos o usuario inactivo.';
     $stmt->close();
 }
 ?>
@@ -137,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
         <form method="post" autocomplete="off">
             <div class="mb-3">
-                <input type="text" name="usuario" placeholder="Usuario" class="form-control" required autofocus>
+                <input type="text" name="usuario" placeholder="Documento (DNI o CE)" class="form-control" required autofocus>
             </div>
             <div class="mb-3">
                 <input type="password" name="contrasena" placeholder="Contraseña" class="form-control" required>

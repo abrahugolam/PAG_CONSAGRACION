@@ -1,51 +1,13 @@
 <?php
 require 'conexion.php';
 
-// Totales (ahora con grupo_consagracion)
-$totalGrupos      = $conn->query("SELECT COUNT(*) FROM grupo_consagracion")->fetch_row()[0];
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+// Conteos
+$totalGrupos      = $conn->query("SELECT COUNT(*) FROM Grupos_Consagracion")->fetch_row()[0];
 $totalIntegrantes = $conn->query("SELECT COUNT(*) FROM Integrantes")->fetch_row()[0];
 $totalAsistencias = $conn->query("SELECT COUNT(*) FROM Asistencia")->fetch_row()[0];
 $totalEncargados  = $conn->query("SELECT COUNT(*) FROM encargados_consagracion")->fetch_row()[0];
-
-// Últimos 5 grupos de grupo_consagracion (usamos id DESC y localidad)
-$ultimosGrupos = $conn->query("
-    SELECT gc.id, l.nombre as localidad, gc.modalidad, gc.estado, gc.fecha_inicio
-    FROM grupo_consagracion gc
-    LEFT JOIN localidades l ON gc.localidad_id = l.id
-    ORDER BY gc.id DESC
-    LIMIT 5
-");
-
-// Últimos 5 encargados de grupo_consagracion (el encargado_id apunta a misioneros)
-$ultimosEncargados = $conn->query("
-    SELECT 
-        CONCAT(m.nombres, ' ', m.apellidos) AS nombres_apellidos, 
-        gc.modalidad, 
-        gc.estado, 
-        gc.fecha_inicio,
-        l.nombre as localidad
-    FROM grupo_consagracion gc
-    LEFT JOIN misioneros m ON gc.encargado_id = m.id
-    LEFT JOIN localidades l ON gc.localidad_id = l.id
-    ORDER BY gc.id DESC
-    LIMIT 5
-");
-
-// Asistencias por día (igual)
-$asistenciasPorDia = $conn->query("
-    SELECT fecha, COUNT(*) as total 
-    FROM Asistencia 
-    WHERE fecha >= CURDATE() - INTERVAL 6 DAY 
-    GROUP BY fecha 
-    ORDER BY fecha
-");
-
-$labels = [];
-$data = [];
-while ($row = $asistenciasPorDia->fetch_assoc()) {
-    $labels[] = $row['fecha'];
-    $data[] = $row['total'];
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -53,14 +15,13 @@ while ($row = $asistenciasPorDia->fetch_assoc()) {
     <meta charset="UTF-8">
     <title>Dashboard - Sistema de Consagración</title>
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-light">
 
 <div class="container py-5">
     <h1 class="text-center mb-5">📊 Dashboard - Sistema de Consagración</h1>
 
-    <!-- Tarjetas resumen -->
+    <!-- Resumen numérico -->
     <div class="row text-center mb-4">
         <div class="col-md-3">
             <div class="card bg-primary text-white shadow-sm">
@@ -96,119 +57,67 @@ while ($row = $asistenciasPorDia->fetch_assoc()) {
         </div>
     </div>
 
-    <!-- Sección rápida de accesos -->
-    <div class="row g-4 mb-5">
-        <div class="col-md-4">
-            <div class="card h-100 border-primary shadow-sm">
-                <div class="card-body text-center">
-                    <h5>➕ Crear Grupo</h5>
-                    <p>Crea nuevos grupos.</p>
-                    <a href="crear_grupo.php" class="btn btn-outline-primary">Ir</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 border-success shadow-sm">
-                <div class="card-body text-center">
-                    <h5>👥 Registrar Integrante</h5>
-                    <p>Agrega personas a los grupos.</p>
-                    <a href="registrar_integrante.php" class="btn btn-outline-success">Ir</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 border-warning shadow-sm">
-                <div class="card-body text-center">
-                    <h5>📝 Tomar Asistencia</h5>
-                    <p>Registra asistencias por grupo.</p>
-                    <a href="tomar_asistencia.php" class="btn btn-outline-warning">Ir</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100 border-secondary shadow-sm">
-                <div class="card-body text-center">
-                    <h5>📄 Reportes</h5>
-                    <p>Consulta historial de asistencias.</p>
-                    <a href="reporte_asistencias.php" class="btn btn-outline-secondary">Ver</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100 border-info shadow-sm">
-                <div class="card-body text-center">
-                    <h5>👨‍🏫 Encargados</h5>
-                    <p>Registrar responsables de grupo.</p>
-                    <a href="registro_encargado.php" class="btn btn-outline-info">Ir</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Accesos -->
+    <div class="row g-4">
 
-    <!-- Últimos registros -->
-    <div class="row mb-5">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light"><strong>📅 Últimos Grupos Creados</strong></div>
-                <ul class="list-group list-group-flush">
-                    <?php while ($g = $ultimosGrupos->fetch_assoc()): ?>
-                        <li class="list-group-item">
-                            <?= htmlspecialchars($g['localidad']) ?> – <?= htmlspecialchars($g['modalidad']) ?>
-                            <br>
-                            <small class="text-muted"><?= htmlspecialchars($g['estado']) ?>, inicio <?= htmlspecialchars($g['fecha_inicio']) ?></small>
-                        </li>
-                    <?php endwhile; ?>
-                </ul>
+        <!-- Crear Grupo -->
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title">➕ Crear Grupo</h5>
+                    <p class="card-text">Crea nuevos grupos de consagración.</p>
+                    <a href="crear_grupo.php" class="btn btn-outline-primary">Ir a Crear Grupo</a>
+                </div>
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light"><strong>👤 Últimos Encargados Registrados</strong></div>
-                <ul class="list-group list-group-flush">
-                    <?php while ($e = $ultimosEncargados->fetch_assoc()): ?>
-                        <li class="list-group-item">
-                            <?= htmlspecialchars($e['nombres_apellidos']) ?> – <?= htmlspecialchars($e['modalidad']) ?><br>
-                            <small class="text-muted"><?= htmlspecialchars($e['estado']) ?>, <?= htmlspecialchars($e['localidad']) ?>, inicio <?= htmlspecialchars($e['fecha_inicio']) ?></small>
-                        </li>
-                    <?php endwhile; ?>
-                </ul>
+        <!-- Registrar Integrante -->
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title">👥 Registrar Integrante</h5>
+                    <p class="card-text">Agrega miembros a los grupos.</p>
+                    <a href="registrar_integrante.php" class="btn btn-outline-success">Registrar Integrante</a>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Gráfico de asistencias -->
-    <div class="card shadow-sm mb-5">
-        <div class="card-body">
-            <h5 class="card-title">📈 Asistencias Registradas (últimos 7 días)</h5>
-            <canvas id="asistenciaChart" height="100"></canvas>
+        <!-- Tomar Asistencia -->
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-warning">
+                <div class="card-body text-center">
+                    <h5 class="card-title">📝 Tomar Asistencia</h5>
+                    <p class="card-text">Registra la asistencia de cada grupo.</p>
+                    <a href="tomar_asistencia.php" class="btn btn-outline-warning">Tomar Asistencia</a>
+                </div>
+            </div>
         </div>
+
+        <!-- Reporte de Asistencias -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="card-title">📄 Reporte de Asistencias</h5>
+                    <p class="card-text">Consulta el historial por grupo o participante.</p>
+                    <a href="reporte_asistencias.php" class="btn btn-outline-secondary">Ver Reportes</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registrar Encargado -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-info">
+                <div class="card-body text-center">
+                    <h5 class="card-title">👨‍🏫 Registrar Encargado</h5>
+                    <p class="card-text">Registra a los responsables de cada grupo.</p>
+                    <a href="registro_encargado.php" class="btn btn-outline-info">Registrar Encargado</a>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
 <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
-<script>
-const ctx = document.getElementById('asistenciaChart').getContext('2d');
-const asistenciaChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?= json_encode($labels) ?>,
-        datasets: [{
-            label: 'Total asistencias',
-            data: <?= json_encode($data) ?>,
-            borderColor: 'rgba(54, 162, 235, 1)',
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-            fill: true,
-            tension: 0.3,
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-</script>
 </body>
 </html>
